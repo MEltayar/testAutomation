@@ -6,10 +6,20 @@ on:
   pull_request:
   workflow_dispatch:   # lets you run it manually from the Actions tab
 
+# Permissions the deploy job needs to publish to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one Pages deployment at a time
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
   ui-tests:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,16 +43,20 @@ jobs:
         if: always()
         run: mvn -B io.qameta.allure:allure-maven:report
 
-      - name: Upload Allure results
+      - name: Upload the report as a Pages artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: allure-results
-          path: target/allure-results
-
-      - name: Upload Allure report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: allure-report
           path: target/site/allure-maven-plugin
+
+  deploy-report:
+    needs: ui-tests
+    if: always()
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
